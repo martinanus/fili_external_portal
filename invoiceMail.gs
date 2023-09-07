@@ -1,4 +1,4 @@
-const formId                            = '1KNc85dALaVtw4ffHUxVdbFS81HcSxSxhOF5vob-t6qk';
+const formId                            = '1YocH8KSWLuhszqMm0pGfrips6U65kxsQL9JSrkWepKQ';
 
 const transactionTypeQuestionTitle      = "Indique su relación con SIP";
 const clientChoice                      = "Soy Cliente - Quiero cargar un comprobante de pago para SIP";
@@ -13,13 +13,14 @@ const invoiceQuestionTitle              = "Adjunte la factura aquí"
 const customMailContentQuestionTitle    = "En caso de querer hacer algún comentario o aclaración para SIP, escriba a continuación"
 
 const bqProjectId                       = 'fili-377220';
-const bqDataset                         = 'fili_sandbox'
+const bqDataset                         = 'fili_sandbox' // TODO - Update this
 
 const bqInvoicePaymentsTableName        = 'ip_01_invoices_and_payments_t'
 const bqCrmTableName                    = 'i_00_counterpart_upload_ext'
 
 const userEmail                         = "anusmartin1@gmail.com"
 const filiWebSiteUrl                    = "www.somosfili.com"
+const internalEmail                     = "soporte@somosfili.com"
 
 
 
@@ -57,25 +58,9 @@ function sendInvoiceToUser(){
 
     uploadAttachedFiles(documents, transactionType);
 
-
-
-    var respondantEmail = "";
     var counterpartName = getCounterpartName(cuit);
 
-    if (counterpartName){
-        respondantEmail = formResponse.getRespondentEmail();
-        Logger.log('Respondant email: "%s"', respondantEmail)
-        Logger.log('Contraparte de ALTA')
-    } else{
-        Logger.log('NO SE ENCONTRÖ CONTRAPART')
-        counterpartName = "Contraparte Desconocida"
-    }
-
-    /* TODO
-     rewrite email and question in forms
-     separate client from provider in wording and unknown counterpart
-    */
-    sendEmailToUser(counterpartName, respondantEmail, documents, customMailContent)
+    sendEmailToUser(counterpartName, documents, customMailContent, transactionType, formResponse)
 }
 
 
@@ -88,19 +73,23 @@ function getCounterpartName(cuit) {
 
     var data = rowsToList(rows)
 
+    if (!data[0]){
+        return "Contraparte Desconocida";
+    }
+
     return data[0];
 }
 
+function sendEmailToUser(counterpartName, documents, customMailContent, destination, formResponse){
 
-
-function sendEmailToUser(counterpartName, respondantEmail, documents, customMailContent){
-
-    var subject     = `Nueva carga en el portal externo de ` + counterpartName ;
-    var body        = getEmailBody(customMailContent, counterpartName);
-    var attachment  = getAttachmentsFromFileIds(documents);
+    var subject         = getSubject(counterpartName, destination)
+    var body            = getEmailBody(customMailContent, counterpartName, destination);
+    var attachment      = getAttachmentsFromFileIds(documents);
+    var respondantEmail = getRespondentEmail(counterpartName, formResponse);
 
     GmailApp.sendEmail(userEmail, subject, '', {
       cc          : respondantEmail,
+      bcc         : internalEmail,
       htmlBody    : body,
       attachments : attachment,
     })
@@ -110,22 +99,40 @@ function sendEmailToUser(counterpartName, respondantEmail, documents, customMail
 }
 
 
-function getAttachmentsFromFileIds(fileIds){
-    blobList = [];
-    for (var i = 0; i < fileIds.length; i++) {
-        let file = DriveApp.getFileById(fileIds[i]);
-        blobList.push(file.getBlob());
+function getSubject(selectedCounterpart, destination){
+    var clientSubject     = `Nuevo Comprobante de pago cargado por ` + selectedCounterpart;
+    var providerSubject   = `Nueva Factura cargada por ` + selectedCounterpart;
+
+    if (destination == "Client"){
+        return clientSubject;
+    } else {
+        return providerSubject;
     }
-    return blobList;
 }
 
-function getEmailBody(customMailContent, counterpartName){
-    var emoji_html = "&#128075;"
-    var body = `Hola ${emoji_html}, <BR><BR>`
-            + `Se cargó un nuevo documento en el Portal Externo por ` + counterpartName + ` <BR><BR>`
+function getRespondentEmail(counterpartName, formResponse){
+    if (counterpartName == "Contraparte Desconocida" ){
+        return "";
+    }
+    return formResponse.getRespondentEmail();
+}
 
-    if (counterpartName == "Contraparte Desconocida"){
-        body += 'La contraparte NO está dada de alta en el sistema. Le solicitamos '
+function getEmailBody(customMailContent, counterpartName, destination){
+    var emoji_html = "&#128075;"
+    var documentType;
+    if (destination == "Client"){
+        documentType = "un nuevo comprobante de pago "
+    } else {
+        documentType = "una nueva factura "
+    }
+
+    var body = `Hola ${emoji_html}, <BR><BR>`
+                + `Se cargó ` + documentType + `en el Portal de Carga Externo`;
+
+    if (counterpartName != "Contraparte Desconocida"){
+        body += ` por parte de ` + counterpartName + ` <BR><BR>`
+    } else {
+        body += '. La contraparte NO está dada de alta en el sistema. Le solicitamos '
         body += 'por favor que realice el alta para contar con los datos de la contraparte <BR><BR>'
     }
 
@@ -135,12 +142,21 @@ function getEmailBody(customMailContent, counterpartName){
         body += '"<BR><BR>'
     }
 
-    body  += `Ajunto encontrarás el documento cargado.<BR><BR>`
-                + `¡Muchas gracias! <BR><BR>`
-                + `El equipo de Fili.`;
+    body +=  `Ajunto encontrarás el documento cargado.<BR><BR>`
+                    + `¡Muchas gracias! <BR><BR>`
+                    + `El equipo de Fili.`;
 
     body += getFiliUrlWithUtm(counterpartName);
 
     return body;
 
+}
+
+function getAttachmentsFromFileIds(fileIds){
+    blobList = [];
+    for (var i = 0; i < fileIds.length; i++) {
+        let file = DriveApp.getFileById(fileIds[i]);
+        blobList.push(file.getBlob());
+    }
+    return blobList;
 }
