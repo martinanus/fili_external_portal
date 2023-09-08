@@ -4,7 +4,7 @@ const transactionTypeQuestionTitle      = "Indique su relación con SIP";
 const clientChoice                      = "Soy Cliente - Quiero cargar un comprobante de pago para SIP";
 const providerChoice                    = "Soy Proveedor - Quiero cargar una factura para SIP";
 
-const cuitQuestionTitle                 = "Indique su CUIT";
+const cuitQuestionTitle                 = "Indique el CUIT de su empresa";
 
 const paymentReceiptQuestionTitle       = "Adjunte el comprobante de pago aquí"
 
@@ -18,7 +18,7 @@ const bqDataset                         = 'fili_sandbox' // TODO - Update this
 const bqInvoicePaymentsTableName        = 'ip_01_invoices_and_payments_t'
 const bqCrmTableName                    = 'i_00_counterpart_upload_ext'
 
-const userEmail                         = "anusmartin1@gmail.com"
+const userEmail                         = "anusmartin1@gmail.com" // TODO - Update this
 const filiWebSiteUrl                    = "www.somosfili.com"
 const internalEmail                     = "soporte@somosfili.com"
 
@@ -60,7 +60,7 @@ function sendInvoiceToUser(){
 
     var counterpartName = getCounterpartName(cuit);
 
-    sendEmailToUser(counterpartName, documents, customMailContent, transactionType, formResponse)
+    sendEmailToUser(counterpartName, documents, customMailContent, transactionType, formResponse, cuit)
 }
 
 
@@ -80,10 +80,10 @@ function getCounterpartName(cuit) {
     return data[0];
 }
 
-function sendEmailToUser(counterpartName, documents, customMailContent, destination, formResponse){
+function sendEmailToUser(counterpartName, documents, customMailContent, destination, formResponse, cuit){
 
     var subject         = getSubject(counterpartName, destination)
-    var body            = getEmailBody(customMailContent, counterpartName, destination);
+    var body            = getEmailBody(customMailContent, counterpartName, destination, cuit);
     var attachment      = getAttachmentsFromFileIds(documents);
     var respondantEmail = getRespondentEmail(counterpartName, formResponse);
 
@@ -117,7 +117,7 @@ function getRespondentEmail(counterpartName, formResponse){
     return formResponse.getRespondentEmail();
 }
 
-function getEmailBody(customMailContent, counterpartName, destination){
+function getEmailBody(customMailContent, counterpartName, destination, cuit){
     var emoji_html = "&#128075;"
     var documentType;
     if (destination == "Client"){
@@ -132,7 +132,7 @@ function getEmailBody(customMailContent, counterpartName, destination){
     if (counterpartName != "Contraparte Desconocida"){
         body += ` por parte de ` + counterpartName + ` <BR><BR>`
     } else {
-        body += '. La contraparte NO está dada de alta en el sistema. Le solicitamos '
+        body += `. <BR>La contraparte identificada con el CUIT ${cuit} NO está dada de alta en el sistema. Le solicitamos `
         body += 'por favor que realice el alta para contar con los datos de la contraparte <BR><BR>'
     }
 
