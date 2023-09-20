@@ -64,7 +64,7 @@ function getFiliUrlWithUtm(client){
 
     console.log("UrlWithUtm: " + UrlWithUtm);
 
-    var htmlText = `<BR><a href=${UrlWithUtm}><font size="-2">Enviado con Fili</font></a>`
+    var htmlText = `<BR><a href=${UrlWithUtm}><font size="-2">Sent with Fili</font></a>`
 
     return htmlText
 }
@@ -82,12 +82,8 @@ function hash_str(str_to_hash){
   }
 
 
-function uploadAttachedFiles(document, transactionType){
-    if (transactionType == "Client"){
-        var destinationFolderId = searchFolderId("Cobranzas")
-    } else {
-        var destinationFolderId = searchFolderId("Pagos")
-    }
+function uploadAttachedFiles(document){
+    var destinationFolderId = searchFolderId("Pagos")
 
     makeFilesCopy(document, destinationFolderId);
 

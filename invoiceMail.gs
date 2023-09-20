@@ -1,16 +1,9 @@
-const formId                            = '1YocH8KSWLuhszqMm0pGfrips6U65kxsQL9JSrkWepKQ';
+const formId                            = '1IuV1P_2as87p2vFy9DcD8hMJ1j_UEMH5IsuXWjRdNws';
 
-const transactionTypeQuestionTitle      = "Indique su relación con SIP";
-const clientChoice                      = "Soy Cliente - Quiero cargar un comprobante de pago para SIP";
-const providerChoice                    = "Soy Proveedor - Quiero cargar una factura para SIP";
 
-const cuitQuestionTitle                 = "Indique el CUIT de su empresa";
-
-const paymentReceiptQuestionTitle       = "Adjunte el comprobante de pago aquí"
-
-const invoiceQuestionTitle              = "Adjunte la factura aquí"
-
-const customMailContentQuestionTitle    = "En caso de querer hacer algún comentario o aclaración para SIP, escriba a continuación"
+const idQuestionTitle                 = "Please indicate the ID of your company (CUIT / SIRET)";
+const invoiceQuestionTitle              = "Please attach your invoice here"
+const customMailContentQuestionTitle    = "If you want to add any comment to the upload, please write it here"
 
 const bqProjectId                       = 'fili-377220';
 const bqDataset                         = 'fili_sandbox' // TODO - Update this
@@ -35,19 +28,10 @@ function sendInvoiceToUser(){
     for (var j = 0; j < itemResponses.length; j++) {
         let itemResponse = itemResponses[j];
         let title        = itemResponse.getItem().getTitle();
-        if (title == transactionTypeQuestionTitle){
-            var transactionType = itemResponse.getResponse();
-            Logger.log('Transaction type : "%s"', transactionType)
-            if (transactionType == clientChoice){
-                var transactionType = "Client";
-            } else if (transactionType == providerChoice){
-                var transactionType = "Provider";
-            }
-            Logger.log('Transaction Type is : "%s"', transactionType)
-        } else if (title == cuitQuestionTitle) {
-            var cuit = itemResponse.getResponse();
-            Logger.log('CUIT is : "%s"', cuit)
-        } else if ((title == paymentReceiptQuestionTitle) || (title == invoiceQuestionTitle)){
+        if (title == idQuestionTitle) {
+            var id = itemResponse.getResponse();
+            Logger.log('ID is : "%s"', id)
+        } else if (title == invoiceQuestionTitle){
             var documents = itemResponse.getResponse();
             Logger.log('Documents to attach Id: "%s"', documents);
         } else if (title == customMailContentQuestionTitle){
@@ -56,34 +40,34 @@ function sendInvoiceToUser(){
         }
     }
 
-    uploadAttachedFiles(documents, transactionType);
+    uploadAttachedFiles(documents);
 
-    var counterpartName = getCounterpartName(cuit);
+    var counterpartName = getCounterpartName(id);
 
-    sendEmailToUser(counterpartName, documents, customMailContent, transactionType, formResponse, cuit)
+    sendEmailToUser(counterpartName, documents, customMailContent, formResponse, id)
 }
 
 
-function getCounterpartName(cuit) {
+function getCounterpartName(id) {
     const query = 'SELECT counterpart FROM '
                  + '`' + bqProjectId + '.' + bqDataset + '.' + bqCrmTableName + '`'
-                 +'WHERE (CUIT = "' + cuit  + '")'
+                 +'WHERE (CUIT = "' + id  + '")'
 
     var rows = runQuery(query)
 
     var data = rowsToList(rows)
 
     if (!data[0]){
-        return "Contraparte Desconocida";
+        return "Unknown Counterpart";
     }
 
     return data[0];
 }
 
-function sendEmailToUser(counterpartName, documents, customMailContent, destination, formResponse, cuit){
+function sendEmailToUser(counterpartName, documents, customMailContent, formResponse, id){
 
-    var subject         = getSubject(counterpartName, destination)
-    var body            = getEmailBody(customMailContent, counterpartName, destination, cuit);
+    var subject         = getSubject(counterpartName)
+    var body            = getEmailBody(customMailContent, counterpartName, id);
     var attachment      = getAttachmentsFromFileIds(documents);
     var respondantEmail = getRespondentEmail(counterpartName, formResponse);
 
@@ -99,52 +83,41 @@ function sendEmailToUser(counterpartName, documents, customMailContent, destinat
 }
 
 
-function getSubject(selectedCounterpart, destination){
-    var clientSubject     = `Nuevo Comprobante de pago cargado por ` + selectedCounterpart;
-    var providerSubject   = `Nueva Factura cargada por ` + selectedCounterpart;
+function getSubject(selectedCounterpart){
+    var providerSubject   = `New invoice loaded by ` + selectedCounterpart;
 
-    if (destination == "Client"){
-        return clientSubject;
-    } else {
-        return providerSubject;
-    }
+    return providerSubject;
 }
 
 function getRespondentEmail(counterpartName, formResponse){
-    if (counterpartName == "Contraparte Desconocida" ){
+    if (counterpartName == "Unknown Counterpart" ){
         return "";
     }
     return formResponse.getRespondentEmail();
 }
 
-function getEmailBody(customMailContent, counterpartName, destination, cuit){
+function getEmailBody(customMailContent, counterpartName, id){
     var emoji_html = "&#128075;"
-    var documentType;
-    if (destination == "Client"){
-        documentType = "un nuevo comprobante de pago "
-    } else {
-        documentType = "una nueva factura "
-    }
 
-    var body = `Hola ${emoji_html}, <BR><BR>`
-                + `Se cargó ` + documentType + `en el Portal de Carga Externo`;
+    var body = `Hello ${emoji_html}, <BR><BR>`
+                + `A new invoice has been uploaded in the Invoice Loading Portal`;
 
-    if (counterpartName != "Contraparte Desconocida"){
-        body += ` por parte de ` + counterpartName + ` <BR><BR>`
+    if (counterpartName != "Unknown Counterpart"){
+        body += ` by ` + counterpartName + ` <BR><BR>`
     } else {
-        body += `. <BR>La contraparte identificada con el CUIT ${cuit} NO está dada de alta en el sistema. Le solicitamos `
-        body += 'por favor que realice el alta para contar con los datos de la contraparte <BR><BR>'
+        body += `. <BR>The counterpart with ID ${id} is NOT registered in the system. Please `
+        body += 'add this counterpart to have all the relative information. <BR><BR>'
     }
 
     if (customMailContent){
-        body += 'En la carga se realizó la siguiente aclaración: <BR><BR>"'
+        body += 'In the Portal, the following comment has been done: <BR><BR>"'
         body += customMailContent.replaceAll("\n", "<BR>");
         body += '"<BR><BR>'
     }
 
-    body +=  `Ajunto encontrarás el documento cargado.<BR><BR>`
-                    + `¡Muchas gracias! <BR><BR>`
-                    + `El equipo de Fili.`;
+    body +=  `Attached you will find the uploaded invoice.<BR><BR>`
+                    + `Thanks and have a good day! <BR><BR>`
+                    + `Fili's Team.`;
 
     body += getFiliUrlWithUtm(counterpartName);
 
